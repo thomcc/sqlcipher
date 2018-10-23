@@ -541,7 +541,7 @@ int sqlite3_rekey_v2(sqlite3 *db, const char *zDb, const void *pKey, int nKey) {
       ** 3. If that goes ok then commit and put ctx->rekey into ctx->key
       **    note: don't deallocate rekey since it may be used in a subsequent iteration 
       */
-      rc = sqlite3BtreeBeginTrans(pDb->pBt, 1); /* begin write transaction */
+      rc = sqlite3BtreeBeginTrans(pDb->pBt, 1, 0); /* begin write transaction */
       sqlite3PagerPagecount(pPager, &page_count);
       for(pgno = 1; rc == SQLITE_OK && pgno <= (unsigned int)page_count; pgno++) { /* pgno's start at 1 see pager.c:pagerAcquire */
         if(!sqlite3pager_is_mj_pgno(pPager, pgno)) { /* skip this page (see pager.c:pagerAcquire for reasoning) */
@@ -681,6 +681,7 @@ void sqlcipher_exportFunc(sqlite3_context *context, int argc, sqlite3_value **ar
   sqlite3 *db = sqlite3_context_db_handle(context);
   const char* attachedDb = (const char*) sqlite3_value_text(argv[0]);
   int saved_flags;        /* Saved value of the db->flags */
+  int saved_mDbFlags;      /* Saved value of the db->mDbFlags */
   int saved_nChange;      /* Saved value of db->nChange */
   int saved_nTotalChange; /* Saved value of db->nTotalChange */
   u8 saved_mTrace;        /* Saved value of db->mTrace */
@@ -694,7 +695,9 @@ void sqlcipher_exportFunc(sqlite3_context *context, int argc, sqlite3_value **ar
   saved_nTotalChange = db->nTotalChange;
   saved_xTrace = db->xTrace;
   saved_mTrace = db->mTrace;
-  db->flags |= SQLITE_WriteSchema | SQLITE_IgnoreChecks | SQLITE_PreferBuiltin;
+  saved_mDbFlags = db->mDbFlags;
+  db->mDbFlags |= DBFLAG_PreferBuiltin;
+  db->flags |= SQLITE_WriteSchema | SQLITE_IgnoreChecks;
   db->flags &= ~(SQLITE_ForeignKeys | SQLITE_ReverseOrder);
   db->xTrace = 0;
   db->mTrace = 0;
@@ -780,6 +783,7 @@ void sqlcipher_exportFunc(sqlite3_context *context, int argc, sqlite3_value **ar
   zSql = NULL;
 end_of_export:
   db->flags = saved_flags;
+  db->mDbFlags = saved_mDbFlags;
   db->nChange = saved_nChange;
   db->nTotalChange = saved_nTotalChange;
   db->xTrace = saved_xTrace;

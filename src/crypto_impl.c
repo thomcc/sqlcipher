@@ -1161,6 +1161,7 @@ int sqlcipher_codec_ctx_migrate(codec_ctx *ctx) {
   int command_idx = 0;
   int password_sz;
   int saved_flags;
+  int saved_mDbFlags;
   int saved_nChange;
   int saved_nTotalChange;
   u8 saved_mTrace;
@@ -1265,11 +1266,13 @@ int sqlcipher_codec_ctx_migrate(codec_ctx *ctx) {
       ** restored before returning. Then set the writable-schema flag, and
       ** disable CHECK and foreign key constraints.  */
       saved_flags = db->flags;
+      saved_mDbFlags = db->mDbFlags;
       saved_nChange = db->nChange;
       saved_nTotalChange = db->nTotalChange;
       saved_xTrace = db->xTrace;
       saved_mTrace = db->mTrace;
-      db->flags |= SQLITE_WriteSchema | SQLITE_IgnoreChecks | SQLITE_PreferBuiltin;
+      db->mDbFlags |= DBFLAG_PreferBuiltin;
+      db->flags |= SQLITE_WriteSchema | SQLITE_IgnoreChecks;
       db->flags &= ~(SQLITE_ForeignKeys | SQLITE_ReverseOrder);
       db->xTrace = 0;
       db->mTrace = 0;
@@ -1279,8 +1282,8 @@ int sqlcipher_codec_ctx_migrate(codec_ctx *ctx) {
       pSrc = pDb->pBt;
       
       rc = sqlite3_exec(db, "BEGIN;", NULL, NULL, NULL);
-      rc = sqlite3BtreeBeginTrans(pSrc, 2);
-      rc = sqlite3BtreeBeginTrans(pDest, 2);
+      rc = sqlite3BtreeBeginTrans(pSrc, 2, 0);
+      rc = sqlite3BtreeBeginTrans(pDest, 2, 0);
       
       assert( 1==sqlite3BtreeIsInTrans(pDest) );
       assert( 1==sqlite3BtreeIsInTrans(pSrc) );
@@ -1301,6 +1304,7 @@ int sqlcipher_codec_ctx_migrate(codec_ctx *ctx) {
       rc = sqlite3BtreeCommit(pDest);
 
       db->flags = saved_flags;
+      db->mDbFlags = saved_mDbFlags;
       db->nChange = saved_nChange;
       db->nTotalChange = saved_nTotalChange;
       db->xTrace = saved_xTrace;
